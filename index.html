@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>GD Tracker</title>
+<style>
+body { 
+    background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed; 
+    background-size: cover; 
+    color: white; 
+    font-family: Arial; 
+    margin:0; 
+    padding:0;
+}
+header { 
+    display:flex; 
+    align-items:center; 
+    justify-content:space-between; 
+    padding:15px; 
+    background: rgba(17,17,17,0.8); 
+    position:sticky; 
+    top:0; 
+    z-index:100; 
+}
+header h1 { margin:0; font-size:22px;}
+nav { display:flex; justify-content:center; gap:15px; flex:1;}
+nav button { padding:8px 14px; border:none; border-radius:6px; cursor:pointer; background:#5865f2; color:white; font-weight:bold;}
+nav button:hover { transform:scale(1.05); }
+
+#addBtn {
+    background: linear-gradient(45deg, #5865f2, #7289da);
+    border:none; padding:12px 20px; color:white;
+    font-size:16px; border-radius:10px; cursor:pointer;
+    margin-top:15px;
+}
+
+section { display:none; padding:20px;}
+section.active { display:block;}
+
+#formContainer { margin:20px auto; width:300px; background:#1a1d26; padding:15px; border-radius:12px;}
+#formContainer input, #formContainer textarea, #formContainer select {
+    width:90%; margin:8px; padding:10px; border-radius:8px; border:none;
+}
+#formContainer button { background:#43b581; border:none; padding:10px; width:90%; border-radius:8px; cursor:pointer;}
+
+.level { background:#1a1d26; margin:10px auto; padding:10px; width:300px; border-radius:10px; position:relative; transition:0.3s; opacity:1;}
+.level.fade-out { opacity:0; transform:translateX(-50px); }
+
+.completed { border-left:5px solid #43b581;}
+.not-completed { border-left:5px solid #f04747;}
+
+.level-buttons { position:absolute; top:10px; right:10px;}
+.level-buttons button { background:#5865f2; border:none; color:white; border-radius:6px; padding:4px 6px; margin-left:4px; cursor:pointer; transition:0.2s;}
+.level-buttons button:hover { transform:scale(1.1); }
+
+.hidden { display:none; }
+
+/* buscador */
+#search {
+  width:300px;
+  padding:10px;
+  border-radius:10px;
+  border:none;
+  margin:10px auto;
+  display:block;
+}
+
+/* modal */
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7);
+  display:flex; justify-content:center; align-items:center;
+  z-index:200;
+}
+.modal-content {
+  background:#1a1d26; padding:25px; border-radius:15px; text-align:center;
+}
+.modal-content input { width:90%; padding:10px; margin:10px; }
+.modal-content button { padding:8px 12px; margin:5px; cursor:pointer; border-radius:8px; border:none; background:#5865f2; color:white; transition:0.2s;}
+.modal-content button:hover { transform:scale(1.05); }
+
+/* toast */
+#toast {
+  position: fixed;
+  bottom:20px; right:20px;
+  background:#43b581;
+  padding:10px 15px;
+  border-radius:10px;
+  opacity:0;
+  transition:0.3s;
+  z-index:300;
+}
+#toast.show { opacity:1; }
+
+/* logros */
+.locked { opacity:0.5; }
+
+/* TikTok follow button */
+#follow {
+  position: fixed;
+  top:10px;
+  right:10px;
+  background:#1a1d26;
+  padding:10px;
+  border-radius:10px;
+  text-align:center;
+  z-index:500; /* arriba de todo */
+}
+#follow p { margin:0 0 5px 0; font-weight:bold;}
+#follow button { background:#ff0050; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; transition:0.2s; color:white; font-size:16px;}
+#follow button:hover { transform:scale(1.1); box-shadow:0 0 10px #ff0050;}
+</style>
+</head>
+<body>
+
+<!-- Modal para cuentas -->
+<div id="userModal" class="modal" style="display:flex;">
+  <div class="modal-content">
+    <h2>👤 Selecciona o crea cuenta</h2>
+    <div id="existingUsers"></div>
+    <input type="text" id="newUser" placeholder="Nueva cuenta">
+    <button onclick="createUser()">Crear</button>
+  </div>
+</div>
+
+<div id="toast">✅ Nivel guardado</div>
+
+<div id="follow">
+  <p>¡Sígueme!</p>
+  <button onclick="window.open('https://www.tiktok.com/@TU_USUARIO','_blank')">🎵 TikTok</button>
+</div>
+
+<header>
+<h1>GD Tracker</h1>
+<nav>
+<button onclick="showSection('levelsSection')">Niveles</button>
+<button onclick="showSection('logrosSection')">Logros</button>
+<button onclick="showSection('perfilSection')">Perfil</button>
+<button onclick="switchUser()">👥 Cambiar cuenta</button>
+</nav>
+</header>
+
+<section id="levelsSection" class="active">
+<input type="text" id="search" placeholder="Buscar..." oninput="render()">
+
+<button id="addBtn" onclick="toggleForm()">+ Añadir nivel</button>
+
+<div id="formContainer" class="hidden">
+<input type="text" id="name" placeholder="Nombre del nivel">
+<input type="number" id="progress" placeholder="Progreso %" min="0" max="100">
+<label><input type="checkbox" id="completed"> Completado</label>
+
+<select id="difficulty">
+<option value="easy">Easy</option>
+<option value="normal">Normal</option>
+<option value="hard">Hard</option>
+<option value="harder">Harder</option>
+<option value="insane">Insane</option>
+<option value="easy demon">Easy Demon</option>
+<option value="medium demon">Medium Demon</option>
+<option value="hard demon">Hard Demon</option>
+<option value="insane demon">Insane Demon</option>
+<option value="extreme demon">Extreme Demon</option>
+</select>
+
+<textarea id="notes" placeholder="Cosas a mejorar..."></textarea>
+<button onclick="saveLevel()">Guardar</button>
+</div>
+
+<div id="levels"></div>
+</section>
+
+<section id="logrosSection">
+<h2>🏆 Logros</h2>
+<div id="logros"></div>
+</section>
+
+<section id="perfilSection">
+<h2>👤 Perfil</h2>
+<div id="statsPerfil"></div>
+</section>
+
+<script>
+// Usuarios y niveles
+let users = JSON.parse(localStorage.getItem("users")) || {};
+let currentUser = localStorage.getItem("currentUser") || null;
+let editIndex = null;
+
+function updateUserList(){
+  const div = document.getElementById("existingUsers");
+  div.innerHTML="";
+  Object.keys(users).forEach(u=>{
+    const userDiv = document.createElement("div");
+    userDiv.style.marginBottom="5px";
+    userDiv.innerHTML = `
+      <span>${u}</span>
+      <button onclick="selectUser('${u}')">Seleccionar</button>
+      <button onclick="deleteUser('${u}')">Eliminar</button>
+    `;
+    div.appendChild(userDiv);
+  });
+}
+
+function createUser(){
+  const name = document.getElementById("newUser").value.trim();
+  if(!name) return alert("Ingresa un nombre válido");
+  if(Object.keys(users).length >= 5) return alert("Máximo 5 cuentas permitidas");
+  if(!users[name]) users[name] = [];
+  selectUser(name);
+}
+
+function selectUser(name){
+  currentUser = name;
+  localStorage.setItem("currentUser", currentUser);
+  document.getElementById("userModal").style.display="none";
+  render();
+  renderPerfil();
+}
+
+function deleteUser(name){
+  if(!confirm(`¿Eliminar la cuenta "${name}"?`)) return;
+  delete users[name];
+  localStorage.setItem("users", JSON.stringify(users));
+  if(currentUser === name){
+    currentUser = null;
+    localStorage.removeItem("currentUser");
+    document.getElementById("userModal").style.display="flex";
+  }
+  updateUserList();
+}
+
+function switchUser(){
+  updateUserList();
+  document.getElementById("userModal").style.display="flex";
+}
+
+function getLevels(){ return users[currentUser] || []; }
+function saveLevels(levels){ users[currentUser]=levels; localStorage.setItem("users", JSON.stringify(users)); }
+
+function showToast(){
+  const t = document.getElementById("toast");
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2000);
+}
+
+function toggleForm(){ document.getElementById("formContainer").classList.toggle("hidden"); }
+
+function showSection(id){
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if(id==='perfilSection') renderPerfil();
+  if(id==='logrosSection') renderLogros();
+}
+
+function saveLevel(){
+  const name = document.getElementById("name").value.trim();
+  const progress = parseInt(document.getElementById("progress").value) || 0;
+  const completed = document.getElementById("completed").checked;
+  const notes = document.getElementById("notes").value;
+  const difficulty = document.getElementById("difficulty").value;
+  if(!name) return;
+
+  let levels = getLevels();
+  if(editIndex!==null){
+    levels[editIndex]={name,progress,completed,notes,difficulty};
+    editIndex=null;
+  } else {
+    levels.push({name,progress,completed,notes,difficulty});
+  }
+
+  saveLevels(levels); render();
+  document.getElementById("formContainer").classList.add("hidden");
+  document.getElementById("name").value="";
+  document.getElementById("progress").value="";
+  document.getElementById("completed").checked=false;
+  document.getElementById("notes").value="";
+  showToast();
+}
+
+function editLevel(index){
+  let levels = getLevels();
+  const level = levels[index];
+  document.getElementById("name").value = level.name;
+  document.getElementById("progress").value = level.progress || 0;
+  document.getElementById("completed").checked = level.completed;
+  document.getElementById("notes").value = level.notes;
+  document.getElementById("difficulty").value = level.difficulty;
+
+  editIndex = index;
+  document.getElementById("formContainer").classList.remove("hidden");
+}
+
+function deleteLevel(index){
+  let levels = getLevels();
+  const divs = document.querySelectorAll("#levels .level");
+  const div = divs[index];
+  div.classList.add("fade-out");
+  setTimeout(()=>{
+    levels.splice(index,1);
+    saveLevels(levels);
+    render();
+  },300);
+}
+
+function render(){
+  const search = document.getElementById("search").value.toLowerCase();
+  const container = document.getElementById("levels");
+  container.innerHTML="";
+  if(!currentUser) return;
+
+  getLevels().filter(l=>l.name.toLowerCase().includes(search))
+  .forEach((l,i)=>{
+    const div=document.createElement("div");
+    div.className="level "+(l.completed?"completed":"not-completed");
+    div.innerHTML=`
+    <h3>${l.name}</h3>
+    <p>Progreso: ${l.progress||0}%</p>
+    <p>${l.completed?"✅ Completado":"❌ No completado"}</p>
+    <p>Dificultad: ${l.difficulty}</p>
+    <small>${l.notes}</small>
+    <div class="level-buttons">
+      <button onclick="editLevel(${i})">✏️</button>
+      <button onclick="deleteLevel(${i})">🗑️</button>
+    </div>`;
+    container.appendChild(div);
+  });
+}
+
+function renderLogros(){
+  const div=document.getElementById("logros");
+  div.innerHTML="";
+  if(!currentUser) return;
+  const levels = getLevels();
+  const completedLevels=levels.filter(l=>l.completed);
+
+  const allLogros=[
+    {text:"Completa 1 nivel", ok:completedLevels.length>=1},
+    {text:"Completa 5 niveles", ok:completedLevels.length>=5},
+    {text:"Completa 10 niveles", ok:completedLevels.length>=10},
+    {text:"Completa tu primer Demon", ok:levels.some(l=>l.difficulty.includes("demon") && l.completed)},
+    {text:"Alcanza 50% en un nivel", ok:levels.some(l=>l.progress>=50)},
+    {text:"Completa un Easy Demon", ok:levels.some(l=>l.difficulty==="easy demon" && l.completed)},
+    {text:"Completa un Medium Demon", ok:levels.some(l=>l.difficulty==="medium demon" && l.completed)},
+    {text:"Completa un Hard Demon", ok:levels.some(l=>l.difficulty==="hard demon" && l.completed)},
+    {text:"Completa un Insane Demon", ok:levels.some(l=>l.difficulty==="insane demon" && l.completed)},
+    {text:"Completa un Extreme Demon", ok:levels.some(l=>l.difficulty==="extreme demon" && l.completed)}
+  ];
+
+  allLogros.forEach(l=>{
+    const p=document.createElement("p");
+    p.className=l.ok?"":"locked";
+    p.textContent=(l.ok?"🏆 ":"🔒 ")+l.text;
+    div.appendChild(p);
+  });
+}
+
+function renderPerfil(){
+  const div=document.getElementById("statsPerfil");
+  if(!currentUser) return;
+  const levels = getLevels();
+  const total=levels.length;
+  const completed=levels.filter(l=>l.completed).length;
+  const percent=total?Math.round(completed/total*100):0;
+
+  div.innerHTML=`
+  <p>Usuario: <strong>${currentUser}</strong></p>
+  <p>Total de niveles: ${total}</p>
+  <p>Niveles completados: ${completed}</p>
+  <p>Progreso total: ${percent}%</p>`;
+}
+
+updateUserList();
+</script>
+
+</body>
+</html>
