@@ -106,16 +106,148 @@ section.active { display:block;}
   padding:10px;
   border-radius:10px;
   text-align:center;
-  z-index:500; /* arriba de todo */
+  z-index:500;
 }
 #follow p { margin:0 0 5px 0; font-weight:bold;}
 #follow button { background:#ff0050; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; transition:0.2s; color:white; font-size:16px;}
 #follow button:hover { transform:scale(1.1); box-shadow:0 0 10px #ff0050;}
+
+/* tutorial */
+#tutorialOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 9999;
+  display: none;
+}
+
+#tutorialHighlight {
+  position: fixed;
+  border: 3px solid #ffffff;
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 10000;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0);
+}
+
+#tutorialBox {
+  position: fixed;
+  max-width: 280px;
+  background: #1a1d26;
+  color: white;
+  border-radius: 12px;
+  padding: 14px;
+  z-index: 10001;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+#tutorialArrowText {
+  font-size: 18px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+#tutorialControls {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+#tutorialControls button {
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #5865f2;
+  color: white;
+  font-weight: bold;
+}
+
+#tutorialControls button:last-child {
+  background: #2f3136;
+}
+
+/* delete confirmation */
+#deleteConfirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+}
+
+#deleteConfirmBox {
+  background: #1a1d26;
+  width: min(92vw, 360px);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  text-align: center;
+}
+
+#deleteConfirmBox h3 {
+  margin: 0 0 10px 0;
+}
+
+#deleteConfirmBox p {
+  margin: 0 0 18px 0;
+  color: #d9d9d9;
+}
+
+#deleteConfirmButtons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+#deleteConfirmButtons button {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+#deleteConfirmButtons button:hover {
+  transform: scale(1.04);
+}
+
+#deleteConfirmCancel {
+  background: #2f3136;
+  color: white;
+}
+
+#deleteConfirmOk {
+  background: #f04747;
+  color: white;
+}
+
+/* profile repeat tutorial button */
+#statsPerfil button {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #5865f2;
+  color: white;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+#statsPerfil button:hover {
+  transform: scale(1.05);
+}
 </style>
 </head>
 <body>
 
-<!-- Modal para cuentas -->
 <div id="userModal" class="modal" style="display:flex;">
   <div class="modal-content">
     <h2>👤 Selecciona o crea cuenta</h2>
@@ -182,23 +314,60 @@ section.active { display:block;}
 <div id="statsPerfil"></div>
 </section>
 
+<div id="tutorialOverlay">
+  <div id="tutorialHighlight"></div>
+  <div id="tutorialBox">
+    <div id="tutorialArrowText">➡️</div>
+    <div id="tutorialText"></div>
+    <div id="tutorialControls">
+      <button id="tutorialSkipBtn" onclick="skipTutorial()">Saltar</button>
+      <button id="tutorialNextBtn" onclick="nextTutorialStep()">Siguiente</button>
+    </div>
+  </div>
+</div>
+
+<div id="deleteConfirmOverlay">
+  <div id="deleteConfirmBox">
+    <h3>Eliminar cuenta</h3>
+    <p id="deleteConfirmText">¿Seguro que quieres eliminar esta cuenta?</p>
+    <div id="deleteConfirmButtons">
+      <button id="deleteConfirmCancel" onclick="closeDeleteConfirm()">Cancelar</button>
+      <button id="deleteConfirmOk" onclick="confirmDeleteUser()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Usuarios y niveles
 let users = JSON.parse(localStorage.getItem("users")) || {};
 let currentUser = localStorage.getItem("currentUser") || null;
 let editIndex = null;
+let pendingDeleteUser = null;
 
 function updateUserList(){
   const div = document.getElementById("existingUsers");
-  div.innerHTML="";
-  Object.keys(users).forEach(u=>{
+  div.innerHTML = "";
+
+  Object.keys(users).forEach(u => {
     const userDiv = document.createElement("div");
-    userDiv.style.marginBottom="5px";
-    userDiv.innerHTML = `
-      <span>${u}</span>
-      <button onclick="selectUser('${u}')">Seleccionar</button>
-      <button onclick="deleteUser('${u}')">Eliminar</button>
-    `;
+    userDiv.style.marginBottom = "5px";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = u;
+    userDiv.appendChild(nameSpan);
+
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.textContent = "Seleccionar";
+    selectBtn.addEventListener("click", () => selectUser(u));
+    userDiv.appendChild(selectBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Eliminar";
+    deleteBtn.addEventListener("click", () => openDeleteConfirm(u));
+    userDiv.appendChild(deleteBtn);
+
     div.appendChild(userDiv);
   });
 }
@@ -214,44 +383,65 @@ function createUser(){
 function selectUser(name){
   currentUser = name;
   localStorage.setItem("currentUser", currentUser);
-  document.getElementById("userModal").style.display="none";
+  document.getElementById("userModal").style.display = "none";
+  showSection("levelsSection");
+  render();
+  renderPerfil();
+  maybeStartTutorial();
+}
+
+function openDeleteConfirm(name){
+  pendingDeleteUser = name;
+  document.getElementById("deleteConfirmText").textContent = `¿Seguro que quieres eliminar la cuenta "${name}"?`;
+  document.getElementById("deleteConfirmOverlay").style.display = "flex";
+}
+
+function closeDeleteConfirm(){
+  pendingDeleteUser = null;
+  document.getElementById("deleteConfirmOverlay").style.display = "none";
+}
+
+function confirmDeleteUser(){
+  if(!pendingDeleteUser) return;
+
+  const name = pendingDeleteUser;
+  delete users[name];
+  localStorage.setItem("users", JSON.stringify(users));
+
+  if(currentUser === name){
+    currentUser = null;
+    localStorage.removeItem("currentUser");
+    document.getElementById("userModal").style.display = "flex";
+  }
+
+  pendingDeleteUser = null;
+  document.getElementById("deleteConfirmOverlay").style.display = "none";
+  updateUserList();
   render();
   renderPerfil();
 }
 
-function deleteUser(name){
-  if(!confirm(`¿Eliminar la cuenta "${name}"?`)) return;
-  delete users[name];
-  localStorage.setItem("users", JSON.stringify(users));
-  if(currentUser === name){
-    currentUser = null;
-    localStorage.removeItem("currentUser");
-    document.getElementById("userModal").style.display="flex";
-  }
-  updateUserList();
-}
-
 function switchUser(){
   updateUserList();
-  document.getElementById("userModal").style.display="flex";
+  document.getElementById("userModal").style.display = "flex";
 }
 
 function getLevels(){ return users[currentUser] || []; }
-function saveLevels(levels){ users[currentUser]=levels; localStorage.setItem("users", JSON.stringify(users)); }
+function saveLevels(levels){ users[currentUser] = levels; localStorage.setItem("users", JSON.stringify(users)); }
 
 function showToast(){
   const t = document.getElementById("toast");
   t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),2000);
+  setTimeout(() => t.classList.remove("show"), 2000);
 }
 
 function toggleForm(){ document.getElementById("formContainer").classList.toggle("hidden"); }
 
 function showSection(id){
-  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  document.querySelectorAll("section").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
-  if(id==='perfilSection') renderPerfil();
-  if(id==='logrosSection') renderLogros();
+  if(id === "perfilSection") renderPerfil();
+  if(id === "logrosSection") renderLogros();
 }
 
 function saveLevel(){
@@ -263,19 +453,20 @@ function saveLevel(){
   if(!name) return;
 
   let levels = getLevels();
-  if(editIndex!==null){
-    levels[editIndex]={name,progress,completed,notes,difficulty};
-    editIndex=null;
+  if(editIndex !== null){
+    levels[editIndex] = {name, progress, completed, notes, difficulty};
+    editIndex = null;
   } else {
-    levels.push({name,progress,completed,notes,difficulty});
+    levels.push({name, progress, completed, notes, difficulty});
   }
 
-  saveLevels(levels); render();
+  saveLevels(levels); 
+  render();
   document.getElementById("formContainer").classList.add("hidden");
-  document.getElementById("name").value="";
-  document.getElementById("progress").value="";
-  document.getElementById("completed").checked=false;
-  document.getElementById("notes").value="";
+  document.getElementById("name").value = "";
+  document.getElementById("progress").value = "";
+  document.getElementById("completed").checked = false;
+  document.getElementById("notes").value = "";
   showToast();
 }
 
@@ -297,27 +488,27 @@ function deleteLevel(index){
   const divs = document.querySelectorAll("#levels .level");
   const div = divs[index];
   div.classList.add("fade-out");
-  setTimeout(()=>{
-    levels.splice(index,1);
+  setTimeout(() => {
+    levels.splice(index, 1);
     saveLevels(levels);
     render();
-  },300);
+  }, 300);
 }
 
 function render(){
   const search = document.getElementById("search").value.toLowerCase();
   const container = document.getElementById("levels");
-  container.innerHTML="";
+  container.innerHTML = "";
   if(!currentUser) return;
 
-  getLevels().filter(l=>l.name.toLowerCase().includes(search))
-  .forEach((l,i)=>{
-    const div=document.createElement("div");
-    div.className="level "+(l.completed?"completed":"not-completed");
-    div.innerHTML=`
+  getLevels().filter(l => l.name.toLowerCase().includes(search))
+  .forEach((l, i) => {
+    const div = document.createElement("div");
+    div.className = "level " + (l.completed ? "completed" : "not-completed");
+    div.innerHTML = `
     <h3>${l.name}</h3>
-    <p>Progreso: ${l.progress||0}%</p>
-    <p>${l.completed?"✅ Completado":"❌ No completado"}</p>
+    <p>Progreso: ${l.progress || 0}%</p>
+    <p>${l.completed ? "✅ Completado" : "❌ No completado"}</p>
     <p>Dificultad: ${l.difficulty}</p>
     <small>${l.notes}</small>
     <div class="level-buttons">
@@ -329,49 +520,189 @@ function render(){
 }
 
 function renderLogros(){
-  const div=document.getElementById("logros");
-  div.innerHTML="";
+  const div = document.getElementById("logros");
+  div.innerHTML = "";
   if(!currentUser) return;
   const levels = getLevels();
-  const completedLevels=levels.filter(l=>l.completed);
+  const completedLevels = levels.filter(l => l.completed);
 
-  const allLogros=[
-    {text:"Completa 1 nivel", ok:completedLevels.length>=1},
-    {text:"Completa 5 niveles", ok:completedLevels.length>=5},
-    {text:"Completa 10 niveles", ok:completedLevels.length>=10},
-    {text:"Completa tu primer Demon", ok:levels.some(l=>l.difficulty.includes("demon") && l.completed)},
-    {text:"Alcanza 50% en un nivel", ok:levels.some(l=>l.progress>=50)},
-    {text:"Completa un Easy Demon", ok:levels.some(l=>l.difficulty==="easy demon" && l.completed)},
-    {text:"Completa un Medium Demon", ok:levels.some(l=>l.difficulty==="medium demon" && l.completed)},
-    {text:"Completa un Hard Demon", ok:levels.some(l=>l.difficulty==="hard demon" && l.completed)},
-    {text:"Completa un Insane Demon", ok:levels.some(l=>l.difficulty==="insane demon" && l.completed)},
-    {text:"Completa un Extreme Demon", ok:levels.some(l=>l.difficulty==="extreme demon" && l.completed)}
+  const allLogros = [
+    {text:"Completa 1 nivel", ok:completedLevels.length >= 1},
+    {text:"Completa 5 niveles", ok:completedLevels.length >= 5},
+    {text:"Completa 10 niveles", ok:completedLevels.length >= 10},
+    {text:"Completa tu primer Demon", ok:levels.some(l => l.difficulty.includes("demon") && l.completed)},
+    {text:"Alcanza 50% en un nivel", ok:levels.some(l => l.progress >= 50)},
+    {text:"Completa un Easy Demon", ok:levels.some(l => l.difficulty === "easy demon" && l.completed)},
+    {text:"Completa un Medium Demon", ok:levels.some(l => l.difficulty === "medium demon" && l.completed)},
+    {text:"Completa un Hard Demon", ok:levels.some(l => l.difficulty === "hard demon" && l.completed)},
+    {text:"Completa un Insane Demon", ok:levels.some(l => l.difficulty === "insane demon" && l.completed)},
+    {text:"Completa un Extreme Demon", ok:levels.some(l => l.difficulty === "extreme demon" && l.completed)}
   ];
 
-  allLogros.forEach(l=>{
-    const p=document.createElement("p");
-    p.className=l.ok?"":"locked";
-    p.textContent=(l.ok?"🏆 ":"🔒 ")+l.text;
+  allLogros.forEach(l => {
+    const p = document.createElement("p");
+    p.className = l.ok ? "" : "locked";
+    p.textContent = (l.ok ? "🏆 " : "🔒 ") + l.text;
     div.appendChild(p);
   });
 }
 
 function renderPerfil(){
-  const div=document.getElementById("statsPerfil");
+  const div = document.getElementById("statsPerfil");
   if(!currentUser) return;
   const levels = getLevels();
-  const total=levels.length;
-  const completed=levels.filter(l=>l.completed).length;
-  const percent=total?Math.round(completed/total*100):0;
+  const total = levels.length;
+  const completed = levels.filter(l => l.completed).length;
+  const percent = total ? Math.round(completed / total * 100) : 0;
 
-  div.innerHTML=`
+  div.innerHTML = `
   <p>Usuario: <strong>${currentUser}</strong></p>
   <p>Total de niveles: ${total}</p>
   <p>Niveles completados: ${completed}</p>
-  <p>Progreso total: ${percent}%</p>`;
+  <p>Progreso total: ${percent}%</p>
+  <button onclick="repeatTutorial()">🔁 Repetir tutorial</button>`;
+}
+
+// tutorial
+const tutorialSteps = [
+  {
+    selector: "#addBtn",
+    text: "Aquí puedes añadir un nivel nuevo. También puedes escribir notas sobre qué mejorar para ir mejorando tu nivel."
+  },
+  {
+    selector: "#search",
+    text: "Este buscador te ayuda a encontrar niveles rápido."
+  },
+  {
+    selector: "nav button[onclick=\"showSection('perfilSection')\"]",
+    text: "Aquí ves tu perfil y tu progreso total."
+  },
+  {
+    selector: "nav button[onclick=\"showSection('logrosSection')\"]",
+    text: "Aquí están tus logros desbloqueados y los que te faltan."
+  },
+  {
+    selector: "nav button[onclick=\"switchUser()\"]",
+    text: "Aquí puedes cambiar de cuenta."
+  }
+];
+
+let tutorialIndex = 0;
+
+function maybeStartTutorial(){
+  if(!currentUser) return;
+  const seen = localStorage.getItem("tutorial_seen_" + currentUser);
+  if(!seen){
+    setTimeout(() => {
+      showSection("levelsSection");
+      startTutorial();
+    }, 350);
+  }
+}
+
+function repeatTutorial(){
+  if(!currentUser) return;
+  localStorage.removeItem("tutorial_seen_" + currentUser);
+  showSection("levelsSection");
+  setTimeout(() => startTutorial(), 250);
+}
+
+function startTutorial(){
+  tutorialIndex = 0;
+  document.getElementById("tutorialOverlay").style.display = "block";
+  showTutorialStep();
+}
+
+function getBestPosition(rect){
+  const boxWidth = 280;
+  const boxHeight = 120;
+  const margin = 14;
+
+  let top = rect.bottom + margin;
+  let left = rect.left;
+
+  if (left + boxWidth > window.innerWidth - 10) {
+    left = window.innerWidth - boxWidth - 10;
+  }
+  if (left < 10) left = 10;
+
+  if (top + boxHeight > window.innerHeight - 10) {
+    top = rect.top - boxHeight - margin;
+  }
+
+  if (top < 10) top = 10;
+
+  return { top, left };
+}
+
+function showTutorialStep(){
+  const step = tutorialSteps[tutorialIndex];
+  const el = document.querySelector(step.selector);
+  if(!el){
+    endTutorial();
+    return;
+  }
+
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  const rect = el.getBoundingClientRect();
+  const overlay = document.getElementById("tutorialOverlay");
+  const highlight = document.getElementById("tutorialHighlight");
+  const box = document.getElementById("tutorialBox");
+  const text = document.getElementById("tutorialText");
+  const arrow = document.getElementById("tutorialArrowText");
+
+  highlight.style.top = (rect.top - 6) + "px";
+  highlight.style.left = (rect.left - 6) + "px";
+  highlight.style.width = (rect.width + 12) + "px";
+  highlight.style.height = (rect.height + 12) + "px";
+
+  const pos = getBestPosition(rect);
+  box.style.top = pos.top + "px";
+  box.style.left = pos.left + "px";
+
+  const boxRect = { top: pos.top, left: pos.left, width: 280, height: 120 };
+
+  if (boxRect.top > rect.bottom) {
+    arrow.textContent = "⬆️";
+  } else if (boxRect.top + boxRect.height < rect.top) {
+    arrow.textContent = "⬇️";
+  } else if (boxRect.left > rect.right) {
+    arrow.textContent = "⬅️";
+  } else {
+    arrow.textContent = "➡️";
+  }
+
+  text.textContent = step.text;
+  overlay.style.display = "block";
+}
+
+function nextTutorialStep(){
+  tutorialIndex++;
+  if(tutorialIndex >= tutorialSteps.length){
+    endTutorial();
+    return;
+  }
+  showTutorialStep();
+}
+
+function skipTutorial(){
+  endTutorial();
+}
+
+function endTutorial(){
+  document.getElementById("tutorialOverlay").style.display = "none";
+  if(currentUser){
+    localStorage.setItem("tutorial_seen_" + currentUser, "true");
+  }
 }
 
 updateUserList();
+if(currentUser){
+  showSection("levelsSection");
+  render();
+  renderPerfil();
+}
 </script>
 
 </body>
